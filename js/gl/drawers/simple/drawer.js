@@ -1,19 +1,12 @@
-import { createShader, createProgram, resize } from "./utils.js";
-import vertexShaderSource from "./shaders/vertex.default.js";
-import fragmentShaderSource from "./shaders/fragment.default.js";
+import { createShader, createProgram } from "../../utils.js";
+import vertexShaderSource from "../../shaders/vertex.default.js";
+import fragmentShaderSource from "../../shaders/fragment.default.js";
 
-const Context = {
-  make() {
-    /** @type { WebGL2RenderingContext } */
-    const gl = viewer.canvas.getContext("webgl2");
-    if (!gl) {
-      throw new Error(
-        "Need WebGL 2 context to run properly. Please consider using a compatible browser."
-      );
-    }
-
-    gl.enable(gl.DEPTH_TEST);
-
+const SimpleDrawer = {
+  /**
+   * @param { WebGL2RenderingContext } gl
+   */
+  make(gl) {
     const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
     const fragmentShader = createShader(
       gl,
@@ -22,6 +15,11 @@ const Context = {
     );
 
     const program = createProgram(gl, vertexShader, fragmentShader);
+
+    gl.detachShader(program, vertexShader);
+    gl.deleteShader(vertexShader);
+    gl.detachShader(program, fragmentShader);
+    gl.deleteShader(fragmentShader);
 
     const positionAttributeLocation = gl.getAttribLocation(
       program,
@@ -37,20 +35,10 @@ const Context = {
 
     const vao = gl.createVertexArray();
 
-    let vertexBuffer = null;
-
-    function updateVertexData({ dataView, count }) {
-      this.count = count;
-
-      vertexBuffer = gl.createBuffer();
-
-      gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-
-      gl.bufferData(gl.ARRAY_BUFFER, dataView, gl.STATIC_DRAW);
+    function bindAttributes(buffer) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
 
       gl.bindVertexArray(vao);
-
-      gl.enableVertexAttribArray(positionAttributeLocation);
 
       const size = 3; // 2 components per iteration
       const type = gl.FLOAT; // the data is 32bit floats
@@ -60,6 +48,7 @@ const Context = {
         4 * Uint8ClampedArray.BYTES_PER_ELEMENT; // the color information
       const offset = 0; // start at the beginning of the buffer
 
+      gl.enableVertexAttribArray(positionAttributeLocation);
       gl.vertexAttribPointer(
         positionAttributeLocation,
         size,
@@ -80,17 +69,12 @@ const Context = {
       );
     }
 
-    return {
-      count: 0,
-      updateVertexData,
-      drawScene() {
-        resize(gl);
-
-        gl.clearColor(0, 0, 0, 0);
-        gl.clear(gl.COLOR_BUFFER_BIT);
-        gl.clear(gl.DEPTH_BUFFER_BIT);
-
-        if (this.count === 0) return;
+    const simpleDrawer = {
+      /**
+       * @param { WebGLBuffer } buffer
+       */
+      draw(buffer, count) {
+        bindAttributes(buffer);
 
         gl.useProgram(program);
 
@@ -100,14 +84,14 @@ const Context = {
           gl.canvas.height / devicePixelRatio
         );
 
-        gl.bindVertexArray(vao);
-
         const primitiveType = gl.TRIANGLES;
         const offset = 0;
-        gl.drawArrays(primitiveType, offset, this.count);
+        gl.drawArrays(primitiveType, offset, count);
       },
     };
+
+    return simpleDrawer;
   },
 };
 
-export default Context;
+export default SimpleDrawer;
